@@ -1,7 +1,8 @@
 Configuration
 -------------
 
-To modify default parameters: open the nextflow.config file 
+To modify default parameters: open the nextflow.config file. 
+Using the command line '--options' will overrride the defaults set in the configuration file.
 
 ### Adapter Sequences
 ```
@@ -30,12 +31,6 @@ slidingwindow = "4:15"
 minlen = 36
 ```
 
-### ARIBA Parameters
-**More than one thread for each ARIBA process is NOT recommnded**
-```
-/* ARIBA */
-ariba_threads = 1
-```
 ### Unicycler Parameters
 ```
 /* Unicycler parameters */

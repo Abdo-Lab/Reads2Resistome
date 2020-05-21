@@ -1,6 +1,4 @@
-:warning: **THIS PIPELINE IS STILL IN EARLY DEVELOPMENT!**
-
-R2R : Reads2Resistome 
+:shield: :pill: R2R : Reads2Resistome :crossed_swords: :dna:
 ---------
 Hybrid and non-hybrid whole genome assembler with resistome identification for Illumina, Nanopore and PacBio reads.
 
@@ -21,14 +19,21 @@ Documentation
   - [Contact](https://github.com/BioRRW/Reads2Resistome/blob/master/docs/contact.md)
   - [Acknowledgements](https://github.com/BioRRW/Reads2Resistome/blob/master/docs/acknowledgements.md)
 
-Support and Contact
+Acknowledgements
+----------------
+
+- [nf-core] for pipeline adaption 
+  - https://nf-co.re/
+- USDA-ARS/ORISE for funding 
+  - https://orise.orau.gov/usda-ars/
+- [@lakinsm] for repository structure adaption
+  - https://github.com/lakinsm/bear-wgs
+  
+  Support and Contact
 -------------------
 Reads2Resistome is developed at Colorado State University within the Abdo Lab.
 For any issues or concerns, please contact us at EMAIL_HERE
 
 Developers
 ----------
-Reed Woyda
-
-References
-----------
+Reed Woyda 

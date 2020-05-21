@@ -3,28 +3,29 @@ Usage
 
 ### Quick Start Example
 
-To run hybrid against a Ecoli database with approximately 16 threads:
+To hybrid-assemble the tutorial sample data against a Ecoli database with approximately 16 threads:
 ```
-nextflow R2R.nf  --input "containers/data/raw/input_3_Samples.csv " --assembly hybrid --output "temp/output" -w "temp/work"
+nextflow R2R-0.0.1.nf  --input "containers/data/raw/input_tutorial.csv " --assembly hybrid --threads 16 --output "temp/output" -w "temp/work" --name R2R_Sample_Hybrid_Assembly
 ```
 
 ### Display Help Message
 
 The `help` parameter displays the available options and commands.
 ```
-$ nextflow R2R.nf --help
+$ nextflow R2R-0.0.1.nf --help
 ```
 
 ## Required command line parameters
     Nextflow Parameters:
         -w              STR     Path to Nextflow working directory
+        --name          STR     Name of current Nextflow run
     Input/Output:
         --input         STR     Path to input (.csv) file 
                                     (*See Input (.csv) File Requirements for details)
         --output        STR     Path to output directory
    
 ## Full list of command line options
-    usage: nextflow R2R.nf [--help] [--input] [--output] [--assembly] [--help] [--leading] [--trailing] [--minlen] [--slindingwindow] [--trailing] [--mode] [--threads] [-resume]
+    usage: nextflow R2R-0.0.1.nf [--help] [--input] [--output] [--assembly] [--help] [--leading] [--trailing] [--minlen] [--slindingwindow] [--trailing] [--mode] [--threads] [--Name] [-resume]
 
     General:
         --help            This help
@@ -45,8 +46,8 @@ $ nextflow R2R.nf --help
                                 normal = moderate contig size and misassembly rate
                                 bold = longest contigs, higher misassembly rate                              
     Annotation: 
-        --ariba_run     STR     (default: true)
-                                false = ARIBA will not run
+        --abricate_run     STR  (default: true)
+                                false = ABRICATE will not run
         --prokka_run    STR     (default: true)
                                 false = Prokka will not run
                                     

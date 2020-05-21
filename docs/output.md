@@ -5,8 +5,15 @@ Output
 
 Output files are written to the user-defined output directory (default: test/) Below we discuss the types of output files produced from each pipeline module and where they can be found on your system.
 
+It is advised to copy the files into a separate location to prevent overwriting previous results:
+```
+cp -rL /temp/output/* ~/<desired_location>
+```
+### Overview of output directories and contents
+![output_dirs](images/output_dirs.png)
+
+
 #### Module FastQC
-(fill in)
 FastQC produces html reports for raw sequence data in FASTQ format. These reports include content related to:
   - Sequence content
   - Sequence quality
@@ -24,7 +31,7 @@ As output, this module produces four outputs:
   - sample.2P.fastq
   - sample.1U.fastq
   - sample.2U.fastq
-
+  
 
 #### Module Unicycler
 
