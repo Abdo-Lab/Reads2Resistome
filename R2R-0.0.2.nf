@@ -1,23 +1,8 @@
 #!/usr/bin/env nextflow
 
 /* Versions
-1.0: working hybrid (tried 2 samples) w/ separate simg files
-1.1: "   " w/poretools QC
-1.2" "              " w/bandage graph
-2.0: hybrid with single simg 18.04 (no porechop yet, need raw-er data)
-2.1: hybrid assembly option added, working on help menu
-2.4: meh
-2.4: adding in short-read only assembly
-2.5: multiqc - working for fastqc
-2.6: Bandage working
-2.7: SISTR functionality for Salmonella, multi-species input, multiqc (except QUAST)
-2.8: beautifying output directories and (testing QUAST multiQC)
-2.9: adding QUAST reference: user must supply!!! (added info to help menu)
-3.0: Re-route input through fastQC first, then nanoplot, trimm and ARIBA
-3.0.1: working on ARIBA issues ********* no prokka or unicycler! **************
-4.0: QUAST (refs via input.csv) Prokka (working on adding in default)
-4.0.1: bam alignments bamdedupe, prokka via input csv ONLY
-5.0: long-read only assembly
+0.0.2: Dedupe removed, added ability for QUAST reference files to be included or not in the input .CSV file
+0.0.2: Error handing added *suggested to use -with-trace option for identification of samples with errors 
 */
 
 /* Display help message */
@@ -38,10 +23,6 @@ threads=params.threads
 quast_ref=params.quast_ref
 /* db=params.db */
 mode=params.mode
-
-/* Set Hybrid/Non-Hybrid flag */
-/* Hybrid = true, Non-Hybrid = false */
-/* Hybrid = checkHybrid(Inputreads) save for when have check */
 
 /* Setup channels */
 files=Channel.create()
@@ -67,15 +48,18 @@ process Porechop {
 */
 
 process FastQC {
+	errorStrategy 'ignore'
+
 	tag "$id"
 	
 	publishDir "${params.output}/Quality_Control/FastQC/Pre_QC", mode: "symlink"
 
 	input:
-		tuple id, file(long_read), file(forward_pair), file(reverse_pair), genus, r_ref, g_ref from files
+		tuple id, file(long_read), file(forward_pair), file(reverse_pair), genus, r_ref, g_ref, quast_ref from files
 		
 	output:
-		tuple id, genus, r_ref, g_ref, file("${long_read}"), file("${forward_pair}"), file("${reverse_pair}") into (files_pre_dedupe)
+		/* tuple id, genus, r_ref, g_ref, file("${long_read}"), file("${forward_pair}"), file("${reverse_pair}") into (files_pre_dedupe) */
+		tuple id, genus, r_ref, g_ref, quast_ref, file("${long_read}"), file("${forward_pair}"), file("${reverse_pair}") into (files_pre_trim)
 		tuple id, file("${long_read}") into (pre_nanoplot)
 		file("*_fastqc.{zip,html}") into (fastqc_pre_trim_results) optional true
 
@@ -93,7 +77,11 @@ process FastQC {
 }
 
 process Nanoplot {
-        tag "$id"
+	/* conda '/opt/miniconda/envs/nanoplot_env' */
+	
+	errorStrategy 'ignore'        
+
+	tag "$id"
 
         publishDir "${params.output}/Quality_Control/Nanoplot/${id}", mode: "symlink"
 
@@ -110,14 +98,16 @@ process Nanoplot {
         when: ( "${assembly}" == "hybrid" || "${assembly}" == "longread" )  && "${params.qc}" == "true"
 
         """
-                NanoPlot --threads ${params.nanoplot_threads} -o Nanoplot -f pdf --title "NanoPlot_${id}_MinION" --fasta ${long_read}
+                NanoPlot --threads ${params.nanoplot_threads} -o Nanoplot -f pdf --title "NanoPlot_${id}_MinION" --fastq ${long_read}
                 mv Nanoplot/NanoPlot-report.html ./${id}.NanoPlot-report.html
                 mv Nanoplot/NanoStats.txt ./${id}.NanoStats.txt
         """
 }
 
 process preMultiQC {
-        conda 'multiqc'
+        /* conda 'multiqc' */
+
+	errorStrategy 'ignore'
 
         publishDir "${params.output}/Quality_Control/MultiQC/Pre_QC", mode: "symlink"
 
@@ -136,7 +126,7 @@ process preMultiQC {
         """
 
 }
-
+/*
 process Dedupe {
 	tag "$id"
 
@@ -147,8 +137,8 @@ process Dedupe {
 
     """
 	if [[ ${params.assembly} == "hybrid" || ${params.assembly} == "nonhybrid" ]]; then
-		dedupe.sh in1=${forward_pair} in2=${reverse_pair} out="${id}_dedupe.fq" ac=f
-		reformat.sh in="${id}_dedupe.fq" out1="${id}_R1_dedupe.fastq" out2="${id}_R2_dedupe.fastq"
+		/opt/bbmap/dedupe.sh in1=${forward_pair} in2=${reverse_pair} out="${id}_dedupe.fq" ac=f
+		/opt/bbmap/reformat.sh in="${id}_dedupe.fq" out1="${id}_R1_dedupe.fastq" out2="${id}_R2_dedupe.fastq"
 	elif [[ ${params.assembly} == "longread" ]]; then
                 touch ${id}_R1_dedupe.fastq
 		touch ${id}_R2_dedupe.fastq
@@ -156,19 +146,21 @@ process Dedupe {
 
     """
 }
-
+*/
 process QualityControl {
+    errorStrategy 'ignore'
+
     tag "$id"
 
     publishDir "${params.output}/Quality_Control/Trimmomatic/${id}", mode: "symlink"
 
     input:
-        tuple id, genus, r_ref, g_ref, file(long_read), file(forward_pair), file(reverse_pair) from files_pre_trim
+        tuple id, genus, r_ref, g_ref, quast_ref, file(long_read), file(forward_pair), file(reverse_pair) from files_pre_trim
     output:
         file "${id}_paired_R1.fastq" optional true
         file "${id}_paired_R2.fastq" optional true
-	/* tuple id, genus, r_ref, g_ref, file("${long_read}"), file("${id}_paired_R1.fastq"), file("${id}_paired_R2.fastq") into (files_pre_unicycler) */
-        tuple id, genus, r_ref, g_ref, file("${long_read}"), file("${id}_paired_R1.fastq"), file("${id}_paired_R2.fastq") into (pre_ariba)
+	tuple id, genus, r_ref, g_ref, quast_ref, file("${long_read}"), file("${id}_paired_R1.fastq"), file("${id}_paired_R2.fastq") into (files_pre_unicycler)
+        /* tuple id, genus, r_ref, g_ref, file("${long_read}"), file("${id}_paired_R1.fastq"), file("${id}_paired_R2.fastq") into (pre_ariba) */
         tuple id, genus, file("${long_read}"), file("${id}_paired_R1.fastq"), file("${id}_paired_R2.fastq") into files_pre_postFastQC
 
 
@@ -177,6 +169,7 @@ process QualityControl {
         if [[ ${params.qc} == "true" ]]; then
 
                 if [[ ${params.assembly} == "hybrid" || ${params.assembly} == "nonhybrid" ]]; then
+			echo ${id}_paired_R1.fastq
                         java -jar ${TRIMMOMATIC} PE $forward_pair $reverse_pair \
                         ${id}_paired_R1.fastq \
                         ${id}_unpaired_R1.fastq \
@@ -200,7 +193,9 @@ process QualityControl {
     /* ILLUMINACLIP:${ADAPTERS}:2:30:10:3:TRUE \ */
 }
 process postFastQC {
-        tag "$id"
+	errorStrategy 'ignore'        
+
+	tag "$id"
 
         publishDir "${params.output}/Quality_Control/FastQC/Post_QC", mode: "symlink"
 
@@ -222,7 +217,9 @@ process postFastQC {
 
 }
 process postMultiQC {
-        conda 'multiqc'
+        /* conda 'multiqc' */
+
+	errorStrategy 'ignore'
 
         publishDir "${params.output}/Quality_Control/MultiQC/Post_QC", mode: "symlink"
 
@@ -242,77 +239,17 @@ process postMultiQC {
 
 }
 
-process ARIBA {
-        tag "$id"
-
-        memory '10 GB'
-	maxForks 1
-
-        publishDir "${params.output}/Annotation/ARIBA/${id}", mode: "symlink"
-
-        input:
-                tuple id, genus, r_ref, g_ref, file(long_read), file(forward), file(reverse) from pre_ariba
-
-
-        output:
-                tuple id, genus, r_ref, g_ref, file("${long_read}"), file("${forward}"), file("${reverse}") into (files_pre_unicycler)
-                tuple id, file("${id}.card.assemblies.fa.gz") into (ariba_card_assemblies) optional true
-                tuple id, file("${id}.megares.assemblies.fa.gz") into (ariba_megares_assemblies) optional true
-                tuple id, file("${id}.plasmidfinder.assemblies.fa.gz") into (ariba_plasmidfinder_assemblies) optional true
-                tuple id, file("${id}.virulencefinder.assemblies.fa.gz") into (ariba_virulencefinder_assemblies) optional true
-                file("${id}.card.report.tsv") into (ariba_card_reports) optional true
-                file("${id}.megares.report.tsv") into (ariba_megares_reports) optional true
-                file("${id}.plasmidfinder.report.tsv") into (ariba_plasmidfinder_reports) optional true
-                file("${id}.virulencefinder.report.tsv") into (ariba_virulencefinder_reports) optional true
-
-
-        """
-        if [[ ${params.ariba_run} == "true" ]]; then
-                ariba run \
-                --threads ${params.ariba_threads} \
-                /opt/card.prepareref.out \
-                ${forward} \
-                ${reverse} ariba_out_card
-                mv ariba_out_card/assemblies.fa.gz ./${id}.card.assemblies.fa.gz
-                mv ariba_out_card/report.tsv ./${id}.card.report.tsv
-
-                ariba run \
-                --threads ${params.ariba_threads} \
-                /opt/megares.prepareref.out \
-                ${forward} \
-                ${reverse} ariba_out_megares
-                mv ariba_out_megares/assemblies.fa.gz ./${id}.megares.assemblies.fa.gz
-                mv ariba_out_megares/report.tsv ./${id}.megares.report.tsv
-
-                ariba run \
-                --threads ${params.ariba_threads} \
-                /opt/plasmidfinder.prepareref.out \
-                ${forward} \
-                ${reverse} ariba_out_plasmidfinder
-                mv ariba_out_plasmidfinder/assemblies.fa.gz ./${id}.plasmidfinder.assemblies.fa.gz
-                mv ariba_out_plasmidfinder/report.tsv ./${id}.plasmidfinder.report.tsv
-
-                ariba run \
-                --threads ${params.ariba_threads} \
-                /opt/virulencefinder.prepareref.out \
-                ${forward} \
-                ${reverse} ariba_out_virulencefinder
-                mv ariba_out_virulencefinder/assemblies.fa.gz ./${id}.virulencefinder.assemblies.fa.gz
-                mv ariba_out_virulencefinder/report.tsv ./${id}.virulencefinder.report.tsv
-	fi
-        """
-
-}
-
 process Unicycler {
+        errorStrategy 'ignore'	
+	
 	tag "$id"
 	
 	publishDir "${params.output}/Assembly/Unicycler/${id}", mode: "symlink"
 
 	input:
-		tuple id, genus, r_ref, g_ref, file(long_read), file(forward), file(reverse) from files_pre_unicycler
+		tuple id, genus, r_ref, g_ref, quast_ref, file(long_read), file(forward), file(reverse) from files_pre_unicycler
 	output:
-		tuple id, genus, r_ref, g_ref, file("${id}.assembly.fasta") into (unicycler_pre_prokka, unicycler_pre_quast, pre_sistr)
+		tuple id, genus, r_ref, g_ref, quast_ref, file("${id}.assembly.fasta") into (unicycler_pre_prokka, unicycler_pre_quast, pre_sistr)
 		tuple id, file("${forward}"), file("${reverse}"), file("${id}.assembly.fasta") into (pre_BAM)
 		tuple id, file("${id}.assembly.gfa") into (pre_bandage)
 		tuple id, file("${id}.assembly.fasta") into (pre_phigaro)
@@ -375,7 +312,9 @@ process Unicycler {
 }
 
 process BAM {
-        tag "$id"
+        errorStrategy 'ignore'        
+
+	tag "$id"
 
         publishDir "${params.output}/Assembly/BAM/${id}", mode: "symlink"
 
@@ -398,12 +337,16 @@ process BAM {
 }
 
 process QUAST {
+	/* conda '/opt/miniconda/envs/quast_env' */
+        
+	errorStrategy 'ignore'	
+
 	tag "$id"
 	
 	publishDir "${params.output}/Assembly/QUAST/${id}", mode: "symlink"
 
 	input:
-		tuple id, genus, r_ref, g_ref, file(assembly_fasta) from unicycler_pre_quast
+		tuple id, genus, r_ref, g_ref, quast_ref, file(assembly_fasta) from unicycler_pre_quast
 		
 	output:
 		file("QUAST/*") into (quast_results)
@@ -411,22 +354,33 @@ process QUAST {
 		file "${id}.report.html"
 
 	"""
-        ${params.quast_path}/quast.py \
-        --threads ${threads} \
-        -o QUAST \
-	--labels "${id}_Assembly" \
-        ${assembly_fasta} \
-        -r ${r_ref} \
-        -g ${g_ref}
+	echo ${quast_ref}
+	if [[ ${quast_ref} == "TRUE" ]]; then
+		quast.py \
+		--threads ${threads} \
+		-o QUAST \
+		--labels "${id}_Assembly" \
+		${assembly_fasta} \
+		-r ${r_ref} \
+		-g ${g_ref}
+	elif [[ ${quast_ref} == "FALSE" ]]; then
+		quast.py \
+		--threads ${threads} \
+		-o QUAST \
+		--labels "${id}_Assembly" \
+		${assembly_fasta} 
+	fi
+
         cp QUAST/report.tsv ./${id}.report.tsv
         cp QUAST/report.html ./${id}.report.html
         cp QUAST/icarus.html ./${id}.icarus.html
+
 	"""
 	
 }
 
 process QUASTMultiQC {
-        conda 'multiqc'
+        /* conda 'multiqc' */
 
         publishDir "${params.output}/Assembly/QUAST/MultiQC", mode: "symlink"
 
@@ -445,54 +399,60 @@ process QUASTMultiQC {
 }
 
 process Bandage {
-    tag "$id"
+        errorStrategy 'ignore'
 
-    publishDir "${params.output}/Assembly/Bandage_graphs", mode: "symlink"
+	tag "$id"
 
-    input:
-	    tuple id, file(assembly_gfa) from pre_bandage
+	publishDir "${params.output}/Assembly/Bandage_graphs", mode: "symlink"
 
-    output:
-	    file "${id}.graph.svg"
+	input:
+		tuple id, file(assembly_gfa) from pre_bandage
+
+	output:
+		file "${id}.graph.svg"
 
 	"""
 	/opt/Bandage image ${assembly_gfa} ${id}.graph.svg
     
 	"""
 }
-/*
+
 process Phigaro {
-    tag "$id"
+        errorStrategy 'ignore'	
 
-    publishDir "${params.output}/Assembly/Phigaro", mode: "symlink"
+	tag "$id"
 
-    input:
-            tuple id, file(assembly_fasta) from pre_phigaro
+	publishDir "${params.output}/Assembly/Phigaro", mode: "symlink"
 
-    output:
-            file ""
+	input:
+		tuple id, file(assembly_fasta) from pre_phigaro
+
+	output:
+		file "${id}.phigaro*"
 
         """
 	phigaro \
 	-f ${assembly_fasta} \
 	-o "${id}.phigaro" \
-        -c /opt/configure/phigaro/config.yml \
+        -c /opt/phigaro/config.yml \
 	-e tsv html \
 	--not-open \
 	-d \
 	-t ${threads}  
         """
 }
-*/
+
 process SISTR {
-        conda 'sistr_cmd'
+        /* conda 'sistr_cmd' */
+
+        errorStrategy 'ignore'
 
         tag "$id"
 
         publishDir "${params.output}/Annotation/SISTR/${id}", mode: "symlink"
 
         input:
-                tuple id, genus, r_ref, g_ref, file (assembly_fasta) from pre_sistr
+                tuple id, genus, r_ref, g_ref, quast_ref, file (assembly_fasta) from pre_sistr
         output:
                 file "${id}-serovar.csv"
 		file "${id}-allele-results.json"
@@ -515,28 +475,33 @@ process SISTR {
 
 }
 process Prokka {
+    errorStrategy 'ignore'
+
     tag "$id"
 
     publishDir "${params.output}/Annotation/Prokka/${id}", mode: "symlink"
 
     input:
-             tuple id, genus, r_ref, g_ref, file(assembly_fasta) from unicycler_pre_prokka
+             tuple id, genus, r_ref, g_ref, quast_ref, file(assembly_fasta) from unicycler_pre_prokka
     output:
             tuple id, file("${id}.*") into (annotated_genome_alignments)
+	    tuple id, file("${id}.genome.gbk") into (pre_abricate)
             file "${id}.genome.tsv"
             file "${id}.genome.gff"
+
     when: "${params.prokka_run}" == "true" 
         """
         if [[ ${genus} == "default" ]]; then
-		/opt/prokka/bin/prokka \
+		prokka \
 		--cpus ${params.prokka_threads} \
 		--outdir Prokka \
 		--force \
 		--prefix ${id}.genome \
 		--kingdom Bacteria \
+		--locustag ${params.locustag} \
 		${assembly_fasta}
         else
-                /opt/prokka/bin/prokka \
+                prokka \
 		--usegenus \
 		--genus ${genus} \
                 --cpus ${params.prokka_threads} \
@@ -544,46 +509,51 @@ process Prokka {
                 --force \
                 --prefix ${id}.genome \
                 --kingdom Bacteria \
-                ${assembly_fasta}
+                --locustag ${params.locustag} \
+		${assembly_fasta}
         fi
         
+	mv Prokka/${id}.genome.txt ./${id}.genome.txt
         mv Prokka/${id}.genome.tsv ./${id}.genome.tsv
         mv Prokka/${id}.genome.err ./${id}.genome.err
-        mv Prokka/${id}.genome.ffn ./${id}.genome.ffn
-        mv Prokka/${id}.genome.fsa ./${id}.genome.fsa
         mv Prokka/${id}.genome.gff ./${id}.genome.gff
         mv Prokka/${id}.genome.sqn ./${id}.genome.sqn
         mv Prokka/${id}.genome.faa ./${id}.genome.faa
         mv Prokka/${id}.genome.fna ./${id}.genome.fna
         mv Prokka/${id}.genome.gbk ./${id}.genome.gbk
         mv Prokka/${id}.genome.log ./${id}.genome.log
-        mv Prokka/${id}.genome.tbl ./${id}.genome.tbl
 
         """
 
 }
 
-process SummarizeAribaReports {
-    tag { "ARIBA Reports" }
-    
-    publishDir "${params.output}/Annotation/ARIBA/Summary", mode: "symlink"
+process ABRICATE {
+    /* conda 'abricate' */
 
-	input:
-		file card_reports from ariba_card_reports.toList()
-		file megares_reports from ariba_megares_reports.toList()
-		file plasmidfinder_reports from ariba_plasmidfinder_reports.toList()
-		file virulencefinder_reports from ariba_virulencefinder_reports.toList()
-    output:
-		tuple file("ariba.card.summary.csv"), file("ariba.megares.summary.csv"), file("ariba.plasmidfinder.summary.csv"), file("ariba.virulencefinder.summary.csv") into (ariba_summary_files) optional true
+    errorStrategy 'ignore'
+
+    tag "$id"
+
+    publishDir "${params.output}/Annotation/ABRICATE", mode: "symlink"
+
+    input:
+	    tuple id, file(assembly_gbk) from (pre_abricate)
+    output: file("${id}.abricate.summary.tab")
+
+    when: "${params.abricate_run}" == "true"
 
     """
-        if [[ ${params.ariba_run} == "true" ]]; then
-		ariba summary ariba.card.summary $card_reports --no_tree
-		ariba summary ariba.megares.summary $megares_reports --no_tree
-		ariba summary ariba.plasmidfinder.summary $plasmidfinder_reports --no_tree
-		ariba summary ariba.virulencefinder.summary $virulencefinder_reports --no_tree
-	fi
+    /opt/miniconda/bin/abricate --setupdb
+    /opt/miniconda/bin/abricate --db plasmidfinder ${assembly_gbk} > ${id}.pf.tab
+    /opt/miniconda/bin/abricate --db argannot ${assembly_gbk} > ${id}.arg.tab
+    /opt/miniconda/bin/abricate --db card ${assembly_gbk} > ${id}.card.tab
+    /opt/miniconda/bin/abricate --db megares ${assembly_gbk} > ${id}.meg.tab
+    /opt/miniconda/bin/abricate --db resfinder ${assembly_gbk} > ${id}.rf.tab
+    /opt/miniconda/bin/abricate --db vfdb ${assembly_gbk} > ${id}.vfdb.tab
+    /opt/miniconda/bin/abricate --db ncbi  ${assembly_gbk} > ${id}.ncbi.tab
+    /opt/miniconda/bin/abricate --summary *.tab > ${id}.abricate.summary.tab
     """
+
 }
 
 /* Input file functions */
@@ -608,29 +578,62 @@ def extractFastq(tsvFile) {
 	def reverse_pair = returnFile(row[4])
 	def long_read = returnFile(row[2])
 	def genus = row[1]
-        def r_ref = returnFile(row[5])
-        def g_ref = returnFile(row[6])
-	[id, long_read, forward_pair, reverse_pair, genus, r_ref, g_ref]  
+        def r_ref = ""
+        def g_ref = ""
+	def quast_ref = "FALSE"
+	if(row[5] == "") {
+	    quast_ref = "FALSE"
+            r_ref = ""
+            g_ref = ""
+	} else if(row[5] != "") {
+	    quast_ref = "TRUE"
+	    r_ref = returnFile(row[5])
+            g_ref = returnFile(row[6])
+
+	}
+	[id, long_read, forward_pair, reverse_pair, genus, r_ref, g_ref, quast_ref]  
     } else if (params.assembly == "nonhybrid") {
 	/* Non-Hybrid */
 	def id = row[0]
 	def forward_pair = returnFile(row[3])
 	def reverse_pair = returnFile(row[4])
         def genus = row[1]
-	def r_ref = returnFile(row[5])
-	def g_ref = returnFile(row[6])
+	def r_ref = ""
+	def g_ref = ""
+        def quast_ref = "FALSE"
+	if(row[5] == "") {
+            quast_ref = "FALSE"
+            r_ref = ""
+            g_ref = "" 
+       } else {
+            quast_ref = "TRUE"
+            r_ref = returnFile(row[5])
+            g_ref = returnFile(row[6])
+
+        }
 	def long_read = ""
-        [id, long_read, forward_pair, reverse_pair, genus, r_ref, g_ref]
+        [id, long_read, forward_pair, reverse_pair, genus, r_ref, g_ref, quast_ref]
     } else if (params.assembly == "longread") {
         /* Long-Read Only */
         def id = row[0]
 	def long_read = returnFile(row[2])
         def genus = row[1]
-        def r_ref = returnFile(row[5])
-        def g_ref = returnFile(row[6])
+        def r_ref = ""
+        def g_ref = ""
+        def quast_ref = "FALSE"
+	if(row[5] == "") {
+            quast_ref = "FALSE"
+            r_ref = ""
+            g_ref = ""
+        } else if(row[5] != ""){
+            quast_ref = "TRUE"
+            r_ref = returnFile(row[5])
+            g_ref = returnFile(row[6])
+
+        }
         def forward_pair = ""
 	def reverse_pair = ""
-        [id, long_read, forward_pair, reverse_pair, genus, r_ref, g_ref]
+        [id, long_read, forward_pair, reverse_pair, genus, r_ref, g_ref, quast_ref]
 
     }
    }
@@ -640,18 +643,19 @@ def helpMessage() {
     //log.info nfcoreHeader()
     log.info"""
 
-usage: mixtisque [--help] [--input] [--output] [--assembly] [--help] [--leading] [--trailing] [--minlen] [--slindingwindow] [--trailing] [--mode] [--serovar] [--threads] [-resume]
+usage: nextflow R2R-0.0.2.nf [--help] [--input] [--output] [--assembly] [--help] [--leading] [--trailing] [--minlen] [--slindingwindow] [--trailing] [--mode] [--serovar] [--threads] [-resume]
     
-Mixtisque: a bacterial genome assembler and resistome identification pipeline 
+Reads2Resistome: a bacterial genome assembler and resistome identification pipeline 
     
     
     Example Usage: (Hybrid assembly using an Ecoli prokka database)
     
-        nextflow mixtisque.nf  --input "containers/data/raw/input_3_Samples.csv " --assembly hybrid --output "temp/output" -w "temp/work" 
+        nextflow R2R-0.0.2.nf.nf  --input "containers/data/raw/input_3_Samples.csv " --assembly hybrid --output "temp/output" -w "temp/work" 
 
     Required command line parameters
 	Nextflow Parameters:
             -w              STR     Path to Nextflow working directory
+	    --name	    STR     Name of current nextflow run
 
         Input/Output:
             --input         STR     Path to input (.csv) file 
@@ -674,10 +678,10 @@ Mixtisque: a bacterial genome assembler and resistome identification pipeline
             --outdir        STR     Output folder [auto] (default '')
             
         Quality Control Options:
-            --leading       INT     cut bases off the start of a read, if below a threshold quality 
-            --minlen        INT     drop the read if it is below a specified length 
-            --slidingwindow INT     perform sw trimming, cutting once the average quality within the window falls below a threshold 
-            --trailing      INT     cut bases off the end of a read, if below a threshold quality 
+            --leading       INT     (default: 3) cut bases off the start of a read, if below a threshold quality 
+            --minlen        INT     (default: 36) drop the read if it is below a specified length 
+            --slidingwindow INT:INT (default: 4:20) perform sw trimming, cutting once the average quality within the window falls below a threshold 
+            --trailing      INT     (default: 3) cut bases off the end of a read, if below a threshold quality 
 
         Assembly: 
             --mode          STR     (default: normal)
@@ -685,17 +689,19 @@ Mixtisque: a bacterial genome assembler and resistome identification pipeline
                                     normal = moderate contig size and misassembly rate
                                     bold = longest contigs, higher misassembly rate                              
         Annotation: 
-            --ariba_run     STR     (default: true)
-                                    false = ARIBA will not run
+            --abricate_run  STR     (default: true)
+                                    false = ABRICATE will not run
             --prokka_run    STR     (default: true)
                                     false = Prokka will not run
+	    --locustag      STR     (default: PROKKA)
+				    Locus tag prefix
         Computation:
             --threads       INT     Number of CPUs to allocate to EACH process individually 
             
         Nextflow Options:
             -resume                 Pipeline will resume from previous run if terminated
 
-     Documentation: https://github.com/BioRRW/Mixtisque
+     Documentation: https://github.com/BioRRW/Reads2Resistome
 
 
     """.stripIndent()

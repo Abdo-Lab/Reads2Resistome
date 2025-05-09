@@ -3,35 +3,56 @@ Usage
 
 ### Quick Start Example
 
-To run hybrid against a Ecoli database with approximately 16 threads:
+To hybrid-assemble the tutorial sample data against a Ecoli database with approximately 16 threads:
 ```
-nextflow R2R.nf  --input "containers/data/raw/input_3_Samples.csv " --assembly hybrid --output "temp/output" -w "temp/work"
+nextflow R2R-0.0.2.nf  --input "containers/data/raw/input_tutorial.csv " --assembly hybrid --threads 16 --output "temp/output" -w "temp/work" --name R2R_Sample_Hybrid_Assembly
 ```
 
 ### Display Help Message
 
 The `help` parameter displays the available options and commands.
 ```
-$ nextflow R2R.nf --help
+$ nextflow R2R-0.0.2.nf --help
+```
+
+### Error Handling
+
+Errors which occur in a given process will terminate the remainder of the processes for that given input sample. In the event and error occurs in the pipeline for a given sample, the remainder of the samples will continue to run. 
+
+*To see which processes have failed, either view the command line output or alternatively include the '-with-trace' option in your run to see which processes have failed. 
+
+Command line example:
+```
+Error executing process > 'FastQC (Tutorial_MinION_Ecoli)'
+Caused by:
+  Process `FastQC (Tutorial_MinION_Ecoli)` terminated with an error exit status (1)
+```
+
+'-with-trace' trace.txt example:
+```
+task_id    hash          native_id       name                               status   exit   
+2          b0/5e641c     35600           FastQC (Tutorial_MinION_Ecoli)     FAILED   1
 ```
 
 ## Required command line parameters
     Nextflow Parameters:
         -w              STR     Path to Nextflow working directory
+        --name          STR     Name of current Nextflow run
     Input/Output:
         --input         STR     Path to input (.csv) file 
                                     (*See Input (.csv) File Requirements for details)
         --output        STR     Path to output directory
    
 ## Full list of command line options
-    usage: nextflow R2R.nf [--help] [--input] [--output] [--assembly] [--help] [--leading] [--trailing] [--minlen] [--slindingwindow] [--trailing] [--mode] [--threads] [-resume]
+    usage: nextflow R2R-0.0.2.nf [--help] [--input] [--output] [--assembly] [--help] [--leading] [--trailing] [--minlen] [--slindingwindow] [--trailing] [--mode] [--threads] [--Name] [-resume]
 
     General:
-        --help            This help
-    Outputs:
+        --help            This help menu
+    Required Outputs:
         --input         STR     Path to input (.csv) file
                                     (*See Input (.csv) File Requirements for details)
-        --outdir        STR     Output folder [auto] (default '')
+        --output        STR     Output folder [auto] (default '')
+        --name          STR     Name of current Nextflow run
         
     Quality Control Options:
         --leading       INT     cut bases off the start of a read, if below a threshold quality 
@@ -45,11 +66,12 @@ $ nextflow R2R.nf --help
                                 normal = moderate contig size and misassembly rate
                                 bold = longest contigs, higher misassembly rate                              
     Annotation: 
-        --ariba_run     STR     (default: true)
-                                false = ARIBA will not run
+        --abricate_run  STR     (default: true)
+                                false = ABRICATE will not run
         --prokka_run    STR     (default: true)
                                 false = Prokka will not run
-                                    
+        --locustag      STR     (default: PROKKA)
+                                Locus tag prefix                              
     Computation:
         --threads       INT     Number of CPUs to allocate to EACH process individually 
         
@@ -63,12 +85,14 @@ $ nextflow R2R.nf --help
 
 ### Input (.csv) File Requirements
     A user supplied input (.csv) is required.
+    * Columns can be left empty but still need to be accounted for with and empty entry: ie. ",," for no long read .fastq file
     
     Required:
             Column 1: Sample ID 
                 (must be unique, sample ID will be used to generate ALL reports for this sample)
             Column 2: Prokka_Database
-                (If not using custom database enter "default")
+                (If not using custom database enter "default"
+                 Else choose from" "Ecoli", "Salmonella", "Efaecalis", "Campy", or "Staph")
             Column 3: Path to long read .fastq file (may update later to input fast5 files)
                     (*Leave BLANK, no spaces, if only providing short reads)
             Column 4: Path to FORWARD short read .fastq file

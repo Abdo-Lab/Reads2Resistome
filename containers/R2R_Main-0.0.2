@@ -5,13 +5,7 @@ MirrorURL:  http://us.archive.ubuntu.com/ubuntu
 # Singularity_Mixtisque.0.1: BBMAP added, MGEfidner removed
 ##############################################################
 %files
-    containers/data/databases/pvog /opt
-    containers/data/configure /opt
     containers/data/references /opt
-    containers/data/databases/card.prepareref.out /opt
-    containers/data/databases/megares.prepareref.out /opt
-    containers/data/databases/plasmidfinder.prepareref.out /opt
-    containers/data/databases/virulencefinder.prepareref.out /opt
     containers/data/databases/Ecoli.tar.xz /opt
     containers/data/databases/Salmonella.tar.xz /opt
     containers/data/databases/Efaecalis.tar.xz /opt
@@ -47,7 +41,7 @@ MirrorURL:  http://us.archive.ubuntu.com/ubuntu
     APP_NAME_Bowtie2="bowtie2"
     VERSION_Bowtie2="2.3.3.1"    
     APP_NAME_samtools="samtools"
-    VERSION_samtools="1.3.1"
+    VERSION_samtools="1.10"
     APP_NAME_BLAST="blast"
     VERSION_BLAST="2.9.0"
     VERSION_pilon="1.23"
@@ -57,7 +51,7 @@ MirrorURL:  http://us.archive.ubuntu.com/ubuntu
     VERSION_PROKKA="1.14.5"
     DEST_PROKKA="/opt/${APP_NAME}-${VERSION}"
     PATH_PROKKA="${PATH}:${DEST}"
-    apt-get update && apt-get install -y build-essential autoconf automake libtool gdb wget unzip perl libdatetime-perl libxml-simple-perl libdigest-md5-perl libncurses5-dev libncursesw5-dev bioperl python3-pip hmmer prodigal locate zlib1g-dev pkg-config libfreetype6-dev libpng-dev python-matplotlib python-setuptools bowtie2 mummer cd-hit git-all bedtools libbz2-dev liblzma-dev mcl parallel cpanminus prank mafft libexpat1-dev fasttree cmake qtcreator libc6-dev openjdk-8-jre
+    apt-get update && apt-get install -y build-essential libcurl4-openssl-dev autoconf automake libtool gdb wget unzip perl libdatetime-perl libxml-simple-perl libdigest-md5-perl libncurses5-dev libncursesw5-dev bioperl python3-pip hmmer prodigal locate zlib1g-dev pkg-config libfreetype6-dev libpng-dev python-matplotlib python-setuptools bowtie2 mummer cd-hit git-all bedtools libbz2-dev liblzma-dev mcl parallel cpanminus prank mafft libexpat1-dev fasttree cmake qtcreator libc6-dev openjdk-8-jre
     apt-get update -y
     apt-get upgrade -y
     # Install Trimmomatic
@@ -72,22 +66,24 @@ MirrorURL:  http://us.archive.ubuntu.com/ubuntu
     chmod 755 /opt/FastQC/fastqc
     ln -s /opt/FastQC/fastqc /usr/local/bin/fastqc
     rm -f ${APP_NAME_FASTQC}-${VERSION_FASTQC}.zip
+    # Install pathlib 
+    #pip3 install --install-option="--prefix=/opt" pathlib 
+    #pip3 install --install-option="--prefix=/opt" joblib
+    #export PATH=/opt:$PATH
     # Install QUAST
-    cd /opt
-    wget -O ${APP_NAME_QUAST}-${VERSION_QUAST}.tar.gz https://downloads.sourceforge.net/project/quast/quast-${VERSION_QUAST}.tar.gz
-    tar -xzf ${APP_NAME_QUAST}-${VERSION_QUAST}.tar.gz
-    rm -f ${APP_NAME_QUAST}-${VERSION_QUAST}.tar.gz
-    chmod 755 ${APP_NAME_QUAST}-${VERSION_QUAST}
-    cd ${APP_NAME_QUAST}-${VERSION_QUAST}
-    ./setup.py install
-    mv /opt/references .
-    chmod 755 quast_libs
-    chmod 755 setup.py
-    chmod 755 quast.py
+    #cd /opt
+    #wget -O ${APP_NAME_QUAST}-${VERSION_QUAST}.tar.gz https://downloads.sourceforge.net/project/quast/quast-${VERSION_QUAST}.tar.gz
+    #tar -xzf ${APP_NAME_QUAST}-${VERSION_QUAST}.tar.gz
+    #rm -f ${APP_NAME_QUAST}-${VERSION_QUAST}.tar.gz
+    #chmod 755 ${APP_NAME_QUAST}-${VERSION_QUAST}
+    #cd ${APP_NAME_QUAST}-${VERSION_QUAST}
+    #./setup.py install
+    #mv /opt/references .
+    #chmod 755 quast_libs
+    #chmod 755 setup.py
+    #chmod 755 quast.py
     # Install Cython
     pip3 install Cython
-    # Install ARIBA
-    pip3 install ariba
     # Install Roary
     cpanm -f Bio::Roary
     # Install BLAST+
@@ -139,6 +135,7 @@ MirrorURL:  http://us.archive.ubuntu.com/ubuntu
     conda update -n base -c defaults conda
     cd /usr/bin
     ln -s /opt/ncbi-blast-2.9.0+/bin/tbl2asn
+    ln -s /opt/miniconda/bin/conda
     rm -r blastp
     rm -r makeblastdb
     ln -s /opt/ncbi-blast-2.9.0+/bin/blastp
@@ -168,7 +165,12 @@ MirrorURL:  http://us.archive.ubuntu.com/ubuntu
     /opt/prokka/bin/prokka --setupdb
     conda install -c bioconda multiqc
     conda install -c bioconda picard
-    pip3 install NanoPlot
+    conda create -n quast_env -c bioconda python=3.7 quast=5.0.2
+    #conda install -c bioconda quast
+    #pip3 install NanoPlot
+    #pip3 install nanomath
+    #conda install -c bioconda nanoplot 
+    conda create -n nanoplot_env -c bioconda python=3.7 nanoplot=1.32.1
     conda install sistr_cmd
     cd /opt
     export QT_SELECT=5
@@ -180,8 +182,3 @@ MirrorURL:  http://us.archive.ubuntu.com/ubuntu
     tar -xvf ${APP_NAME_BBMAP}-${VERSION_BBMAP}.tar.gz
     rm -f ${APP_NAME_BBMAP}-${VERSION_BBMAP}.tar.gz
     export PATH=/opt/bbmap/:$PATH
-    cd /opt
-    git clone https://github.com/bobeobibo/phigaro.git && cd phigaro && python3 setup.py install && 
-    yes N | phigaro-setup
-    cd /usr/bin
-    ln -s /opt/miniconda/bin/phigaro
